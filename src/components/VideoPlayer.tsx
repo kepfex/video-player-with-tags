@@ -73,6 +73,22 @@ export const VideoPlayer = ({ src, tags }: VideoPlayerProps) => {
   return (
     <div className="flex flex-col gap-4">
       <div className="relative border shadow-md shadow-black/50 rounded-md overflow-hidden w-225 h-125 drop-shadow-sm group">
+        {/* Overlay de etiquetas activas */}
+        <div className="absolute top-4 left-4 z-30 flex flex-col gap-2 pointer-events-none">
+          {state.activeTags.map((tag) => (
+            <div
+              key={tag.id}
+              className="px-3 py-1.5 rounded-md text-white text-xs font-bold shadow-lg transform transition-all duration-300 animate-in fade-in slide-in-from-left-4"
+              style={{ 
+                backgroundColor: tag.color,
+                borderLeft: '4px solid rgba(255,255,255,0.4)' 
+              }}
+            >
+              {tag.label.toUpperCase()}
+            </div>
+          ))}
+        </div>
+
         <video
           className="w-full h-full object-cover"
           ref={videoRef}
@@ -89,7 +105,7 @@ export const VideoPlayer = ({ src, tags }: VideoPlayerProps) => {
             <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
           </div>
         )}
-        
+
         <VideoControls
           // Estados
           progress={state.progress}

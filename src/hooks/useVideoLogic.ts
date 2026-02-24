@@ -91,6 +91,16 @@ export const useVideoLogic = (tags: Tag[]) => {
         }
     }, [segments])
 
+    // Tag activo para mostrar label sobre el video
+    const activeTags = useMemo(() => {
+        // Buscamos los tags cuyo intervalo (real) incluya el tiempo actual del video
+        // Usamos el tiempo real del video para comparar con los datos originales de los tags
+        const realTime = videoRef.current?.currentTime || 0;
+
+        return tags.filter(tag =>
+            realTime >= tag.start && realTime <= tag.end
+        );
+    }, [tags, progress, segments]); // Se recalcula cuando cambia el progreso
 
     return {
         videoRef,
@@ -103,7 +113,8 @@ export const useVideoLogic = (tags: Tag[]) => {
             isFullScreen,
             isBuffering,
             virtualDuration,
-            snapPoints
+            snapPoints,
+            activeTags
         },
         actions: {
             togglePlay,
