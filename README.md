@@ -11,7 +11,7 @@ https://video-player-tags.netlify.app/
 
 ## 📸 Preview
 
-![Smart Interview Video Player](./assets/PreviewVideoPlayerWithTags.PNG)
+![Smart Interview Video Player](./public/PreviewVideoPlayerWithTags.PNG)
 
 ---
 
@@ -87,13 +87,16 @@ Navegación contextual que utiliza los bordes de las etiquetas como puntos de an
 
 ```bash
 git clone https://github.com/tu-usuario/video-player-tags.git
+```
 
 ### 2️⃣ Instalar dependencias
 
 ```bash
 npm install
+```
 
 ### 3️⃣ Ejecutar en desarrollo
 
 ```bash
 npm run dev
+```
