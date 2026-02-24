@@ -74,7 +74,7 @@ export const VideoControls = ({
             ></div>
           </div>
           <span className="text-white mr-2">
-            {duration}
+            {formatTime(duration)}
           </span>
         </div>
         <div className="flex items-center">

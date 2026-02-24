@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { VideoControls } from "./VideoControls"
+import { VideoTimeline } from "./VideoTimeline"
+
+import { VideoNavigationControls } from "./VideoNavigationControls"
+import type { Tag } from "../types"
 
 interface VideoPlayerProps {
   src: string
+  tags: Tag[]
 }
 
-export const VideoPlayer = ({ src }: VideoPlayerProps) => {
+export const VideoPlayer = ({ src, tags }: VideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
   const [isPlaying, setIsPlaying] = useState(false)
@@ -16,11 +21,35 @@ export const VideoPlayer = ({ src }: VideoPlayerProps) => {
   const [duration, setDuration] = useState(0)
   const [isBuffering, setIsBuffering] = useState(false)
 
+  
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return
 
-    const handleTimeUpdate = () => setProgress(video.currentTime)
+    const handleTimeUpdate = () => {
+      const video = videoRef.current
+      if (!video) return
+
+      const current = video.currentTime
+
+      const currentCut = cuts.find(cut =>
+        current >= cut.start && current <= cut.end
+      )
+
+      if (!currentCut) {
+        // Buscar el siguiente corte válido
+        const nextCut = cuts.find(cut => current < cut.start)
+
+        if (nextCut) {
+          video.currentTime = nextCut.start
+        } else {
+          // Si no hay más cortes, pausamos
+          video.pause()
+        }
+      }
+
+      setProgress(video.currentTime)
+    }
     const handleDurationChange = () => setDuration(video.duration)
 
     video.addEventListener('timeupdate', handleTimeUpdate)
@@ -83,41 +112,86 @@ export const VideoPlayer = ({ src }: VideoPlayerProps) => {
       setIsFullScreen(false)
     }
   }, [isFullScreen])
-  return (
-    <div className="relative border shadow-2xl shadow-black rounded-md overflow-hidden w-225 h-125 drop-shadow-sm group">
-      <video
-        className="w-full h-full object-cover"
-        ref={videoRef}
-        src={src}
-        onClick={togglePlay}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onWaiting={() => setIsBuffering(true)}
-        onPlaying={() => setIsBuffering(false)}
-        onTimeUpdate={e => setProgress(e.currentTarget.currentTime)}
-        onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
-      ></video>
-      {/* Mostrar Spinner */}
-      {isBuffering && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
-      <VideoControls
-        // Estados
-        progress={progress}
-        duration={duration}
-        isPlaying={isPlaying}
-        volume={volume}
-        playbackRate={playbackRate}
-        isFullScreen={isFullScreen}
 
-        // Funciones del reproductor
-        togglePlay={togglePlay}
-        onSeek={handleSeek}
-        onVolumeChange={handleVolumeChange}
-        onPlaybackRateChange={handlePlaybackRateChange}
-        onToggleFullScreen={toggleFullScreen}
+  // Obtener cortes desde los tags
+  const cuts = tags.map(tag => ({
+    start: tag.start,
+    end: tag.end
+  })).sort((a, b) => a.start - b.start)
+
+  const goToNextSegment = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const current = video.currentTime
+
+    const nextCut = cuts.find(cut => cut.start > current)
+
+    if (nextCut) {
+      video.currentTime = nextCut.start
+    }
+  }, [])
+
+  const goToPrevSegment = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const current = video.currentTime
+
+    const prevCuts = cuts.filter(cut => cut.start < current)
+
+    if (prevCuts.length > 0) {
+      const prevCut = prevCuts[prevCuts.length - 1]
+      video.currentTime = prevCut.start
+    }
+  }, [])
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="relative border shadow-md shadow-black/50 rounded-md overflow-hidden w-225 h-125 drop-shadow-sm group">
+        <video
+          className="w-full h-full object-cover"
+          ref={videoRef}
+          src={src}
+          onClick={togglePlay}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onWaiting={() => setIsBuffering(true)}
+          onPlaying={() => setIsBuffering(false)}
+          onTimeUpdate={e => setProgress(e.currentTarget.currentTime)}
+          onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
+        ></video>
+        {/* Mostrar Spinner */}
+        {isBuffering && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+        <VideoControls
+          // Estados
+          progress={progress}
+          duration={duration}
+          isPlaying={isPlaying}
+          volume={volume}
+          playbackRate={playbackRate}
+          isFullScreen={isFullScreen}
+
+          // Funciones del reproductor
+          togglePlay={togglePlay}
+          onSeek={handleSeek}
+          onVolumeChange={handleVolumeChange}
+          onPlaybackRateChange={handlePlaybackRateChange}
+          onToggleFullScreen={toggleFullScreen}
+        />
+      </div>
+      <VideoNavigationControls
+        onNext={goToNextSegment}
+        onPrev={goToPrevSegment}
+      />
+      <VideoTimeline
+        tags={tags}
+        duration={duration}
+        currentTime={progress}
       />
     </div>
   )
