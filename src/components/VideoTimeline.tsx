@@ -1,5 +1,7 @@
+import { useMemo } from "react"
 import type { Tag } from "../types"
 import { buildTimelineTracks } from "../utils/buildTimelineTracks"
+import { getValidSegments, realToVirtual } from "../utils/time"
 
 type VideoTimelineProps = {
   tags: Tag[]
@@ -13,7 +15,11 @@ export const VideoTimeline = ({
   currentTime
 }: VideoTimelineProps) => {
 
-  const tracks = buildTimelineTracks(tags)
+  // Obtenemos los segmentos para poder mapear tiempos reales a virtuales
+  const segments = useMemo(() => getValidSegments(tags), [tags]);
+  
+  // Construimos las pistas (tracks) normalmente
+  const tracks = buildTimelineTracks(tags);
 
   return (
     <div className="w-full bg-neutral-900 rounded-md p-4">
@@ -33,8 +39,12 @@ export const VideoTimeline = ({
             <div key={track.trackIndex} className="relative h-8 bg-neutral-700 rounded">
 
               {track.tags.map(tag => {
-                const left = (tag.start / duration) * 100
-                const width = ((tag.end - tag.start) / duration) * 100
+                // Convertimos el inicio y fin REAL del tag a su posición VIRTUAL
+                const virtualStart = realToVirtual(tag.start, segments);
+                const virtualEnd = realToVirtual(tag.end, segments);
+
+                const left = (virtualStart / duration) * 100;
+                const width = ((virtualEnd - virtualStart) / duration) * 100;
 
                 return (
                   <div
@@ -43,7 +53,11 @@ export const VideoTimeline = ({
                     style={{
                       left: `${left}%`,
                       width: `${width}%`,
-                      backgroundColor: tag.color || "#3b82f6"
+                      backgroundColor: tag.color || "#3b82f6",
+                      // Resaltar si el tiempo actual está dentro de este tag
+                      border: currentTime >= virtualStart && currentTime <= virtualEnd 
+                        ? '3px solid white' 
+                        : 'none'
                     }}
                   >
                     {tag.label}

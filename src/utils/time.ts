@@ -12,10 +12,10 @@ export interface TimeSegment {
 export const getValidSegments = (tags: Tag[]): TimeSegment[] => {
     if (tags.length === 0) return [];
 
-    // 1. Ordenar por inicio
+    // Ordenar por inicio
     const sorted = [...tags].sort((a, b) => a.start - b.start);
 
-    // 2. Fusionar intervalos solapados
+    // Fusionar intervalos solapados
     const merged: { start: number, end: number }[] = [];
     let current = { start: sorted[0].start, end: sorted[0].end };
 
@@ -29,7 +29,7 @@ export const getValidSegments = (tags: Tag[]): TimeSegment[] => {
     }
     merged.push(current);
 
-    // 3. Calcular el inicio virtual de cada segmento
+    // Calcular el inicio virtual de cada segmento
     let cumulativeVirtualTime = 0;
     return merged.map(seg => {
         const segment = { ...seg, virtualStart: cumulativeVirtualTime };

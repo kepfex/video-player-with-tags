@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { VideoControls } from "./VideoControls"
 import { VideoTimeline } from "./VideoTimeline"
 
 import { VideoNavigationControls } from "./VideoNavigationControls"
 import type { Tag } from "../types"
+import { getValidSegments, realToVirtual, virtualToReal } from "../utils/time"
 
 interface VideoPlayerProps {
   src: string
@@ -21,35 +22,38 @@ export const VideoPlayer = ({ src, tags }: VideoPlayerProps) => {
   const [duration, setDuration] = useState(0)
   const [isBuffering, setIsBuffering] = useState(false)
 
-  
+  const segments = useMemo(() => getValidSegments(tags), [tags]);
+  const virtualDuration = useMemo(() =>
+    segments.reduce((acc, s) => acc + (s.end - s.start), 0),
+    [segments]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return
 
     const handleTimeUpdate = () => {
-      const video = videoRef.current
-      if (!video) return
+      const video = videoRef.current;
+      if (!video) return;
 
-      const current = video.currentTime
+      const realTime = video.currentTime;
 
-      const currentCut = cuts.find(cut =>
-        current >= cut.start && current <= cut.end
-      )
-
-      if (!currentCut) {
-        // Buscar el siguiente corte válido
-        const nextCut = cuts.find(cut => current < cut.start)
-
-        if (nextCut) {
-          video.currentTime = nextCut.start
+      // Regla del Dominio: Saltar secciones ocultas
+      const currentSegment = segments.find(s => realTime >= s.start && realTime <= s.end);
+      if (!currentSegment) {
+        const nextSegment = segments.find(s => s.start > realTime);
+        if (nextSegment) {
+          video.currentTime = nextSegment.start;
+          return;
         } else {
-          // Si no hay más cortes, pausamos
-          video.pause()
+          video.pause();
         }
       }
 
-      setProgress(video.currentTime)
-    }
+      // Actualizar el progreso virtual para la UI
+      const vTime = realToVirtual(realTime, segments);
+      setProgress(vTime); // Ahora 'progress' es virtual
+    };
+
     const handleDurationChange = () => setDuration(video.duration)
 
     video.addEventListener('timeupdate', handleTimeUpdate)
@@ -73,13 +77,15 @@ export const VideoPlayer = ({ src, tags }: VideoPlayerProps) => {
   }, [])
 
   // Controlar el progreso (SEEK)
-  const handleSeek = useCallback((time: number) => {
-    const video = videoRef.current
+  const handleSeek = useCallback((vTime: number) => {
+    const video = videoRef.current;
     if (!video) return;
 
-    video.currentTime = time
-    setProgress(time)
-  }, [])
+    // Convertimos el click de la barra (virtual) a lo que el video entiende (real)
+    const rTime = virtualToReal(vTime, segments);
+    video.currentTime = rTime;
+    setProgress(vTime);
+  }, [segments]);
 
   // Controlar volumen 
   const handleVolumeChange = useCallback((value: number) => {
@@ -158,8 +164,6 @@ export const VideoPlayer = ({ src, tags }: VideoPlayerProps) => {
           onPause={() => setIsPlaying(false)}
           onWaiting={() => setIsBuffering(true)}
           onPlaying={() => setIsBuffering(false)}
-          onTimeUpdate={e => setProgress(e.currentTarget.currentTime)}
-          onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
         ></video>
         {/* Mostrar Spinner */}
         {isBuffering && (
@@ -170,7 +174,7 @@ export const VideoPlayer = ({ src, tags }: VideoPlayerProps) => {
         <VideoControls
           // Estados
           progress={progress}
-          duration={duration}
+          duration={virtualDuration}
           isPlaying={isPlaying}
           volume={volume}
           playbackRate={playbackRate}
@@ -190,7 +194,7 @@ export const VideoPlayer = ({ src, tags }: VideoPlayerProps) => {
       />
       <VideoTimeline
         tags={tags}
-        duration={duration}
+        duration={virtualDuration}
         currentTime={progress}
       />
     </div>
