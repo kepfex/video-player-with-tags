@@ -125,32 +125,78 @@ export const VideoPlayer = ({ src, tags }: VideoPlayerProps) => {
     end: tag.end
   })).sort((a, b) => a.start - b.start)
 
+  const snapPoints = useMemo(() => {
+    const points = new Set<number>();
+    points.add(0); // Inicio total
+    points.add(virtualDuration); // Fin total
+
+    segments.forEach(seg => {
+      // Los bordes de los segmentos válidos son puntos clave
+      points.add(seg.virtualStart);
+      points.add(seg.virtualStart + (seg.end - seg.start));
+    });
+
+    // Convertimos los puntos de los tags a virtual y los agregamos
+    tags.forEach(tag => {
+      points.add(realToVirtual(tag.start, segments));
+      points.add(realToVirtual(tag.end, segments));
+    });
+
+    return Array.from(points).sort((a, b) => a - b);
+  }, [segments, tags, virtualDuration]);
+
+
   const goToNextSegment = useCallback(() => {
     const video = videoRef.current
     if (!video) return
-
-    const current = video.currentTime
-
-    const nextCut = cuts.find(cut => cut.start > current)
-
-    if (nextCut) {
-      video.currentTime = nextCut.start
-    }
-  }, [])
+    // Buscamos el primer punto de interés mayor al progreso virtual actual
+    const nextPoint = snapPoints.find(p => p > progress + 0.1);
+    if (nextPoint !== undefined) handleSeek(nextPoint);
+  }, [snapPoints, progress, handleSeek])
 
   const goToPrevSegment = useCallback(() => {
     const video = videoRef.current
     if (!video) return
 
-    const current = video.currentTime
-
-    const prevCuts = cuts.filter(cut => cut.start < current)
-
-    if (prevCuts.length > 0) {
-      const prevCut = prevCuts[prevCuts.length - 1]
-      video.currentTime = prevCut.start
+    // Buscamos el último punto de interés menor al progreso virtual actual
+    const prevPoints = snapPoints.filter(p => p < progress - 0.1);
+    if (prevPoints.length > 0) {
+      handleSeek(prevPoints[prevPoints.length - 1]);
     }
-  }, [])
+  }, [snapPoints, progress, handleSeek])
+
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Evitar que la barra espaciadora haga scroll en la página
+      if (e.code === "Space") {
+        e.preventDefault();
+        togglePlay();
+      }
+
+      if (e.code === "ArrowRight") {
+        e.preventDefault();
+        // Buscar el primer punto mayor al tiempo actual
+        const nextPoint = snapPoints.find(p => p > progress + 0.1); // +0.1 para evitar bucles en el mismo punto
+        if (nextPoint !== undefined) {
+          handleSeek(nextPoint);
+        }
+      }
+
+      if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        // Buscar el último punto menor al tiempo actual
+        const prevPoints = snapPoints.filter(p => p < progress - 0.1);
+        if (prevPoints.length > 0) {
+          const lastPrevPoint = prevPoints[prevPoints.length - 1];
+          handleSeek(lastPrevPoint);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [progress, snapPoints, togglePlay, handleSeek]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -188,14 +234,19 @@ export const VideoPlayer = ({ src, tags }: VideoPlayerProps) => {
           onToggleFullScreen={toggleFullScreen}
         />
       </div>
-      <VideoNavigationControls
-        onNext={goToNextSegment}
-        onPrev={goToPrevSegment}
-      />
       <VideoTimeline
         tags={tags}
         duration={virtualDuration}
         currentTime={progress}
+      />
+
+      <VideoNavigationControls
+        isPlaying={isPlaying}
+        onNext={goToNextSegment}
+        onPrev={goToPrevSegment}
+        togglePlay={togglePlay}
+        realDuration={duration}
+        virtualDuration={virtualDuration}
       />
     </div>
   )
